@@ -114,7 +114,7 @@ def main():
 
     git_head_observer = Observer()
     git_head_observer.schedule(looker1, repo_root / '.git/')
-    git_head_observer.schedule(looker2, repo_root / '.git/refs/heads')
+    git_head_observer.schedule(looker2, repo_root / '.git/refs', recursive=True)
     git_head_observer.start()
 
     t = threading.Thread(target=git_log_thread_main)
