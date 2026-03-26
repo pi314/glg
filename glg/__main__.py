@@ -53,7 +53,7 @@ def git_log_thread_main():
 
         # display git log with pager
         with plock:
-            pager_proc = iroiro.command(['less', '-R'], stdin=git_log, stdout=None, stderr=None)
+            pager_proc = iroiro.command(['less', '-R', '+g'], stdin=git_log, stdout=None, stderr=None)
 
         try:
             pager_proc.run(wait=False)
