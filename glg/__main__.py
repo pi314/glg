@@ -109,12 +109,72 @@ def main():
         sys.exit(p.returncode)
     repo_root = pathlib.Path(p.stdout.lines[0])
 
+    def errorout(lines):
+        kwargs = {'file': sys.stderr}
+        print('Error:', **kwargs)
+        for line in lines:
+            print(line, **kwargs)
+        sys.exit(1)
+
+    dot_git = repo_root / '.git'
+    if dot_git.is_dir():
+        head_dir = dot_git
+
+    elif dot_git.is_file():
+        # maybe it's a worktree
+        with dot_git.open() as f:
+            lines = [line.strip() for line in f]
+            if len(lines) != 1:
+                error([
+                    dot_git,
+                    'File is not a valid .git worktree',
+                    ])
+                sys.exit(1)
+
+        line = lines[0]
+        if not line.startswith('gitdir: '):
+            errorout([
+                'File: ' + str(dot_git),
+                line,
+                'File is not a valid .git worktree',
+                ])
+
+        gitdir = pathlib.Path(line[len('gitdir: '):])
+        if not gitdir.exists():
+            errorout([gitdir, 'Not exists'])
+        if not gitdir.is_dir():
+            errorout([gitdir, 'Not dir'])
+
+        commondir = gitdir / 'commondir'
+        if not commondir.exists():
+            errorout([commondir, 'Not exists'])
+
+        with commondir.open() as f:
+            lines = [line.strip() for line in f]
+            if len(lines) != 1:
+                errorout([commondir, 'File is not a valid .git worktree commondir file'])
+                sys.exit(1)
+            rpath = lines[0]
+
+        commondir = (gitdir / rpath).resolve()
+
+        if not commondir.exists():
+            errorout([commondir, 'Not exists'])
+
+        dot_git = commondir
+        head_dir = gitdir
+
+    else:
+        errorout(dot_git)
+
+    dot_git_refs = dot_git / 'refs'
+
     looker1 = GitFileMonitor(refresh_git_log, interested='HEAD')
     looker2 = GitFileMonitor(refresh_git_log)
 
     git_head_observer = Observer()
-    git_head_observer.schedule(looker1, repo_root / '.git/')
-    git_head_observer.schedule(looker2, repo_root / '.git/refs', recursive=True)
+    git_head_observer.schedule(looker1, head_dir)
+    git_head_observer.schedule(looker2, dot_git_refs, recursive=True)
     git_head_observer.start()
 
     t = threading.Thread(target=git_log_thread_main)
